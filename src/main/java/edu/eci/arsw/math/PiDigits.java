@@ -18,6 +18,52 @@ public class PiDigits {
      * @param count The number of digits to return
      * @return An array containing the hexadecimal digits.
      */
+    public static byte[] getDigits(int start, int count, int N) {
+        if (start < 0 || count < 0) {
+            throw new RuntimeException("Invalid Interval");
+        }
+        if (N <= 0) {
+            throw new RuntimeException("Number of threads must be positive");
+        }
+
+        byte[] digits = new byte[count];
+        PiDigitsThread[] threads = new PiDigitsThread[N];
+        int digitsPerThread = count / N;
+        int remainder = count % N;
+
+        int currentStart = start;
+        int offset = 0;
+
+        for (int i = 0; i < N; i++) {
+            int threadCount = digitsPerThread + (i < remainder ? 1 : 0);
+            threads[i] = new PiDigitsThread(currentStart, threadCount);
+            threads[i].start();
+            currentStart += threadCount;
+            offset += threadCount;
+        }
+
+        offset = 0;
+        for (int i = 0; i < N; i++) {
+            try {
+                threads[i].join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+            byte[] threadDigits = threads[i].getDigits();
+            System.arraycopy(threadDigits, 0, digits, offset, threadDigits.length);
+            offset += threadDigits.length;
+        }
+
+        return digits;
+    }
+
+    /**
+     * Returns a range of hexadecimal digits of pi.
+     * @param start The starting location of the range.
+     * @param count The number of digits to return
+     * @return An array containing the hexadecimal digits.
+     */
     public static byte[] getDigits(int start, int count) {
         if (start < 0) {
             throw new RuntimeException("Invalid Interval");
