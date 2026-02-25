@@ -8,7 +8,7 @@ package edu.eci.arsw.math;
 ///  </summary>
 public class PiDigits {
 
-    private static int DigitsPerSum = 8;
+    static int DigitsPerSum = 8;
     private static double Epsilon = 1e-17;
 
     
@@ -26,23 +26,51 @@ public class PiDigits {
             throw new RuntimeException("Number of threads must be positive");
         }
 
+        PauseControl pauseControl = new PauseControl();
         byte[] digits = new byte[count];
         PiDigitsThread[] threads = new PiDigitsThread[N];
         int digitsPerThread = count / N;
         int remainder = count % N;
-
         int currentStart = start;
-        int offset = 0;
 
         for (int i = 0; i < N; i++) {
             int threadCount = digitsPerThread + (i < remainder ? 1 : 0);
-            threads[i] = new PiDigitsThread(currentStart, threadCount);
+            threads[i] = new PiDigitsThread(currentStart, threadCount, pauseControl);
             threads[i].start();
             currentStart += threadCount;
-            offset += threadCount;
         }
 
-        offset = 0;
+        Thread controlThread = new Thread(() -> {
+            java.util.Scanner scanner = new java.util.Scanner(System.in);
+            while (anyThreadAlive(threads)) {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                if (!anyThreadAlive(threads)) break;
+
+                pauseControl.pause();
+
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    return;
+                }
+
+                for (PiDigitsThread t : threads) {
+                    System.out.println(t.getName() + " - Digits processed: " + t.getProcessedDigits());
+                }
+                System.out.println("Press ENTER to continue...");
+                scanner.nextLine();
+
+                pauseControl.resume();
+            }
+        });
+        controlThread.setDaemon(true);
+        controlThread.start();
+
+        int offset = 0;
         for (int i = 0; i < N; i++) {
             try {
                 threads[i].join();
@@ -56,6 +84,13 @@ public class PiDigits {
         }
 
         return digits;
+    }
+
+    private static boolean anyThreadAlive(PiDigitsThread[] threads) {
+        for (PiDigitsThread t : threads) {
+            if (t.isAlive()) return true;
+        }
+        return false;
     }
 
     /**
@@ -99,7 +134,7 @@ public class PiDigits {
     /// <param name="m"></param>
     /// <param name="n"></param>
     /// <returns></returns>
-    private static double sum(int m, int n) {
+    static double sum(int m, int n) {
         double sum = 0;
         int d = m;
         int power = n;
